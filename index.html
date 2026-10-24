@@ -298,8 +298,9 @@ L* = min(E* ÷ N, 上限)</div>
       <div class="panel">
         <div class="callout big" id="rebalCallout"></div>
         <div class="fields">
-          <label class="f">提前調整門檻<input type="number" id="band" data-k="band" step="0.05" min="0"></label>
+          <label class="f">提前調整門檻<small>一般用 0.2 就好</small><input type="number" id="band" data-k="band" step="0.05" min="0"></label>
         </div>
+        <p class="note">目前槓桿和目標槓桿差多少才要馬上交易。沒超過就等每月領薪後再調整；超過代表偏離太多、風險變高，要立刻買賣。例如目標 2 倍、門檻 0.2：1.9 倍不用急，大跌後變 2.25 倍就要馬上賣。門檻調小會交易得比較頻繁，手續費和稅也比較多。</p>
         <h3>若全部用單一標的調整</h3>
         <div class="tbl-wrap">
           <table>
