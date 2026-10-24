@@ -94,10 +94,18 @@ td.r, th.r { text-align: right; }
 .pill.bad { color: var(--bad); background: var(--bad-soft); }
 .buy { color: var(--good); } .sell { color: var(--bad); }
 
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-.seg button { border: 0; border-radius: 0; background: transparent; }
-.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
 
+.q { display: flex; flex-direction: column; gap: 8px; }
+.choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.choices button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; }
+.choices button span { font-size: .78rem; color: var(--muted); }
+.choices button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.choices button[aria-pressed="true"] b { color: var(--accent); }
+details { border-top: 1px solid var(--line); padding-top: 10px; }
+details > summary { cursor: pointer; color: var(--muted); font-size: .85rem; }
+details[open] > summary { margin-bottom: 12px; }
+.hname { font-size: .75rem; color: var(--muted); padding: 2px 2px 0; white-space: nowrap; }
+.hname.miss { color: var(--warn); }
 .callout { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
 .callout.big { font-size: 1.05rem; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
@@ -160,11 +168,12 @@ footer { color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line
         </div>
         <div class="tbl-wrap">
           <table class="edit">
-            <thead><tr><th>名稱</th><th>股數</th><th>股價</th><th>曝險倍數</th><th class="r">曝險</th><th></th></tr></thead>
+            <thead><tr><th>代號</th><th>股數</th><th>股價</th><th>倍數</th><th class="r">曝險</th><th></th></tr></thead>
             <tbody id="hBody"></tbody>
           </table>
         </div>
-        <p class="note">曝險倍數：一般股票或 ETF 填 1，正2 ETF 填 2；期貨請把「股數 × 股價」填成契約價值。</p>
+        <p class="note" id="priceStatus"></p>
+        <p class="note">填上市櫃代號（例如 0050、00631L、2330）就會自動帶入名稱和股價。1 張 = 1000 股。倍數會自動判斷：正2 = 2、反1 = −1、債券 ETF = 0、其他 = 1。期貨請自己填契約價值。</p>
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <h3>負債</h3><button type="button" id="addD">＋ 新增負債</button>
         </div>
@@ -198,57 +207,69 @@ L = E ÷ N</div>
     <div class="step-head">
       <span class="step-no">STEP 2</span>
       <h2>生命週期目標槓桿</h2>
-      <p>把未來的薪水儲蓄也當成資產。每年重新計算 PV、T 和 s。</p>
+      <p>把退休前還能存的錢也算成你的資產。年輕時這筆錢遠大於存款，所以適合借錢放大股票部位。每年回來更新一次。</p>
     </div>
     <div class="step-body">
       <div class="panel">
-        <h3>每年可投資儲蓄 S</h3>
+        <h3>你一年能存多少</h3>
         <div class="fields">
-          <label class="f">年薪<input type="number" id="salary" data-k="salary" step="10000"></label>
-          <label class="f">年生活費<input type="number" id="living" data-k="living" step="10000"></label>
-          <label class="f">年利息支出<small>還款中的本金算儲蓄</small><input type="number" id="interest" data-k="interest" step="1000"></label>
+          <label class="f">年薪<small>含年終、獎金</small><input type="number" id="salary" data-k="salary" step="10000"></label>
+          <label class="f">年生活費<small>不含房貸、信貸還款</small><input type="number" id="living" data-k="living" step="10000"></label>
+          <label class="f">一年付的利息<small>只算利息，本金不算</small><input type="number" id="interest" data-k="interest" step="1000"></label>
         </div>
-        <h3>未來儲蓄現值 PV</h3>
+        <h3>你還要工作幾年</h3>
         <div class="fields">
           <label class="f">目前年齡<input type="number" id="age" data-k="age" step="1"></label>
-          <label class="f">距離退休年數 T<input type="number" id="T" data-k="T" step="1" min="0"></label>
-          <label class="f">折現率 d (%)<small>薪水穩定 3–4%</small><input type="number" id="d" data-k="d" step="0.5"></label>
-          <label class="f">PV 折扣 (%)<small>工作不穩可填 70–80</small><input type="number" id="haircut" data-k="haircut" step="5" min="0" max="100"></label>
+          <label class="f">預計退休年齡<input type="number" id="retireAge" data-k="retireAge" step="1"></label>
+          <label class="f">借錢的年利率 (%)<small>信貸或質押的利率</small><input type="number" id="rb" data-k="rb" step="0.25"></label>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-          <h3>股票占終身財富比例 s</h3>
-          <div class="seg" role="group" aria-label="s 的來源">
-            <button type="button" id="sModeDirect">直接填</button>
-            <button type="button" id="sModeFormula">用公式算</button>
+        <div class="q">
+          <h3>你的收入穩定嗎？</h3>
+          <div class="choices" role="group" aria-label="收入穩定度">
+            <button type="button" data-preset="stab:stable"><b>很穩定</b><span>公教、大公司正職</span></button>
+            <button type="button" data-preset="stab:normal"><b>普通</b><span>一般上班族</span></button>
+            <button type="button" data-preset="stab:unstable"><b>不穩定</b><span>接案、業務、新創</span></button>
           </div>
         </div>
-        <div class="fields">
-          <label class="f" id="sDirectWrap">s<input type="number" id="sDirect" data-k="sDirect" step="0.05"></label>
-          <label class="f">預期報酬 (%)<input type="number" id="mu" data-k="mu" step="0.5"></label>
-          <label class="f">借款利率 (%)<input type="number" id="rb" data-k="rb" step="0.25"></label>
-          <label class="f">風險趨避係數<input type="number" id="gamma" data-k="gamma" step="0.5" min="0.1"></label>
-          <label class="f">波動率 (%)<input type="number" id="vol" data-k="vol" step="1" min="1"></label>
-          <label class="f">槓桿上限<input type="number" id="cap" data-k="cap" step="0.1" min="0"></label>
+        <div class="q">
+          <h3>股市大跌時你的承受度？</h3>
+          <div class="choices" role="group" aria-label="風險承受度">
+            <button type="button" data-preset="risk:low"><b>保守</b><span>大跌會睡不著</span></button>
+            <button type="button" data-preset="risk:mid"><b>穩健</b><span>短期大跌能接受</span></button>
+            <button type="button" data-preset="risk:high"><b>積極</b><span>跌一半也不會賣</span></button>
+          </div>
         </div>
-        <p class="note" id="sFormulaNote"></p>
+        <details>
+          <summary>進階設定（看不懂可以不用改）</summary>
+          <div class="fields">
+            <label class="f">折現率 d (%)<small>未來的錢打幾折算成今天的錢</small><input type="number" id="d" data-k="d" step="0.5"></label>
+            <label class="f">未來收入打折 (%)<small>100 = 確定拿得到</small><input type="number" id="haircut" data-k="haircut" step="5" min="0" max="100"></label>
+            <label class="f">股票預期年報酬 (%)<small>台股長期約 7%</small><input type="number" id="mu" data-k="mu" step="0.5"></label>
+            <label class="f">股票波動率 (%)<small>每年漲跌幅的大小，大盤約 20%</small><input type="number" id="vol" data-k="vol" step="1" min="1"></label>
+            <label class="f">風險趨避係數<small>越大越怕虧損，對應上面的承受度</small><input type="number" id="gamma" data-k="gamma" step="0.5" min="0.1"></label>
+            <label class="f">槓桿上限<small>最多借到幾倍</small><input type="number" id="cap" data-k="cap" step="0.1" min="0"></label>
+          </div>
+        </details>
       </div>
       <div class="panel result">
         <dl class="kv">
-          <dt>每年儲蓄 S</dt><dd id="rS"></dd>
-          <dt>年金因子</dt><dd id="rAF"></dd>
-          <dt>未來儲蓄現值 PV</dt><dd id="rPV"></dd>
-          <dt>終身財富 W</dt><dd id="rW"></dd>
-          <dt>採用的 s</dt><dd id="rs"></dd>
-          <dt>目標曝險 E*</dt><dd id="rEs"></dd>
-          <dt>E* ÷ N</dt><dd id="rRatio"></dd>
+          <dt>每年可投資的錢 S</dt><dd id="rS"></dd>
+          <dt>退休前還能存的錢，換算成今天 PV</dt><dd id="rPV"></dd>
+          <dt>終身財富 W（現在 + 未來）</dt><dd id="rW"></dd>
+          <dt>終身財富放股票的比例 s</dt><dd id="rs"></dd>
+          <dt>應有的股票部位 E*</dt><dd id="rEs"></dd>
+          <dt>E* ÷ 淨資產</dt><dd id="rRatio"></dd>
           <dt>目標槓桿 L*</dt><dd id="rLs" class="big"></dd>
         </dl>
         <p class="note" id="rLsNote"></p>
-        <div class="formula">PV = S × [1 − (1+d)^(−T)] ÷ d
+        <details>
+          <summary>公式</summary>
+          <div class="formula">PV = S × [1 − (1+d)^(−T)] ÷ d × 打折
 W  = N + PV
+s  = (預期報酬 − 借款利率) ÷ (風險趨避 × 波動率²)
 E* = s × W
-L* = min(E* ÷ N, 上限)
-s  = (預期報酬 − 借款利率) ÷ (風險趨避 × 波動率²)</div>
+L* = min(E* ÷ N, 上限)</div>
+        </details>
       </div>
     </div>
   </section>
@@ -356,20 +377,44 @@ s  = (預期報酬 − 借款利率) ÷ (風險趨避 × 波動率²)</div>
 const EXAMPLE = {
   cash: 200000, other: 0,
   holdings: [
-    { name: "0050", shares: 6000, price: 190, mult: 1 },
-    { name: "00631L 正2", shares: 1000, price: 160, mult: 2 }
+    { code: "0050", name: "元大台灣50", shares: 10000, price: 106.9, mult: 1 },
+    { code: "00631L", name: "元大台灣50正2", shares: 6000, price: 35.61, mult: 2 }
   ],
   debts: [{ name: "信貸", amt: 500000 }],
   salary: 960000, living: 580000, interest: 20000,
-  age: 30, T: 30, d: 3, haircut: 100,
-  sMode: "direct", sDirect: 0.6, mu: 7, rb: 3, gamma: 2, vol: 20, cap: 2,
+  age: 30, retireAge: 60, d: 3, haircut: 100,
+  mu: 7, rb: 3, gamma: 2, vol: 20, cap: 2,
   band: 0.2, mLoan: 0, mColl: 0, maint: 130
+};
+// 白話選項對應到的進階參數
+const PRESETS = {
+  "stab:stable": { d: 3, haircut: 100 }, "stab:normal": { d: 3, haircut: 85 }, "stab:unstable": { d: 4, haircut: 70 },
+  "risk:low": { gamma: 3 }, "risk:mid": { gamma: 2 }, "risk:high": { gamma: 1.5 }
 };
 const KEY = "lifecycle-leverage-v1";
 let st;
 try { st = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { st = null; }
 const restored = !!(st && st.savedAt);
+// 舊版資料：T 改成退休年齡、持股名稱改成代號
+if (st && st.T != null && st.retireAge == null) st.retireAge = (st.age ?? 30) + st.T;
+if (st && st.holdings) st.holdings.forEach(h => { if (h.code == null) h.code = String(h.name || "").split(" ")[0]; });
 st = Object.assign(structuredClone(EXAMPLE), st || {});
+
+// 股價：GitHub Action 每個交易日更新 prices.json
+let PRICES = null;
+const guessMult = name => /正2/.test(name) ? 2 : /反1|反向/.test(name) ? -1 : /債/.test(name) ? 0 : 1;
+const quote = code => PRICES && PRICES.q[String(code || "").trim().toUpperCase()];
+function applyPrices() {
+  st.holdings.forEach(h => { const q = quote(h.code); if (q) { h.name = q[0]; h.price = q[1]; } });
+  $("priceStatus").textContent = `股價為 ${PRICES.date} 收盤價，每個交易日傍晚自動更新。`;
+}
+async function loadPrices() {
+  try {
+    const r = await fetch("prices.json", { cache: "no-cache" });
+    PRICES = await r.json();
+    applyPrices(); renderLists(); compute();
+  } catch (e) { $("priceStatus").textContent = "暫時抓不到股價，請自己填。"; }
+}
 const stamp = t => new Date(t).toLocaleString("zh-TW", { dateStyle: "medium", timeStyle: "short" });
 let saveOk = true;
 const save = () => {
@@ -395,7 +440,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 
 function renderLists() {
   $("hBody").innerHTML = st.holdings.map((h, i) => `<tr>
-    <td><input type="text" id="h${i}name" data-l="holdings" data-i="${i}" data-f="name" value="${esc(h.name)}" aria-label="名稱"></td>
+    <td><input type="text" id="h${i}code" data-l="holdings" data-i="${i}" data-f="code" value="${esc(h.code)}" placeholder="例如 0050" aria-label="代號"><div class="hname" id="hN${i}"></div></td>
     <td><input type="number" id="h${i}shares" data-l="holdings" data-i="${i}" data-f="shares" value="${h.shares}" step="100" aria-label="股數"></td>
     <td><input type="number" id="h${i}price" data-l="holdings" data-i="${i}" data-f="price" value="${h.price}" step="0.1" aria-label="股價"></td>
     <td><input type="number" id="h${i}mult" data-l="holdings" data-i="${i}" data-f="mult" value="${h.mult}" step="1" aria-label="曝險倍數"></td>
@@ -405,6 +450,13 @@ function renderLists() {
     <td><input type="text" id="d${i}name" data-l="debts" data-i="${i}" data-f="name" value="${esc(d.name)}" aria-label="項目"></td>
     <td><input type="number" id="d${i}amt" data-l="debts" data-i="${i}" data-f="amt" value="${d.amt}" step="10000" aria-label="餘額"></td>
     <td><button type="button" class="x" data-del="debts" data-i="${i}" aria-label="刪除">✕</button></td></tr>`).join("");
+  st.holdings.forEach((_, i) => showName(i));
+}
+function showName(i) {
+  const h = st.holdings[i], el = $("hN" + i), q = quote(h.code);
+  const miss = !q && PRICES && String(h.code || "").trim();
+  el.textContent = q ? q[0] : miss ? "查無此代號，請自己填股價" : (h.name || "");
+  el.classList.toggle("miss", !!miss);
 }
 function fillInputs() {
   document.querySelectorAll("[data-k]").forEach(el => { el.value = st[el.dataset.k]; });
@@ -435,19 +487,17 @@ function compute() {
 
   // STEP 2
   const S = num(st.salary) - num(st.living) - num(st.interest);
-  const d = num(st.d) / 100, T = Math.max(0, num(st.T)), mu = num(st.mu) / 100, rb = num(st.rb) / 100;
+  const d = num(st.d) / 100, T = Math.max(0, num(st.retireAge) - num(st.age)), mu = num(st.mu) / 100, rb = num(st.rb) / 100;
   const gamma = num(st.gamma), vol = num(st.vol) / 100, cap = num(st.cap);
-  const sF = gamma > 0 && vol > 0 ? (mu - rb) / (gamma * vol * vol) : NaN;
-  const s = st.sMode === "formula" ? sF : num(st.sDirect);
+  const s = gamma > 0 && vol > 0 ? (mu - rb) / (gamma * vol * vol) : NaN;
   const c = { S, d, haircut: num(st.haircut) / 100, s, cap };
   const t = targetL(N, T, c);
-  const AF = d > 0 ? (1 - Math.pow(1 + d, -T)) / d : T;
 
-  $("sModeDirect").setAttribute("aria-pressed", st.sMode !== "formula");
-  $("sModeFormula").setAttribute("aria-pressed", st.sMode === "formula");
-  $("sDirect").disabled = st.sMode === "formula";
-  $("sFormulaNote").textContent = `公式算出 s = (${(mu*100).toFixed(1)}% − ${(rb*100).toFixed(1)}%) ÷ (${gamma} × ${(vol*100).toFixed(0)}%²) = ${isFinite(sF) ? sF.toFixed(2) : "—"}`;
-  $("rS").textContent = money(S); $("rAF").textContent = AF.toFixed(2);
+  document.querySelectorAll("[data-preset]").forEach(b => {
+    const p = PRESETS[b.dataset.preset];
+    b.setAttribute("aria-pressed", Object.keys(p).every(k => num(st[k]) === p[k]));
+  });
+  $("rS").textContent = money(S);
   $("rPV").textContent = money(t.PV); $("rW").textContent = money(t.W);
   $("rs").textContent = isFinite(s) ? s.toFixed(2) : "—";
   $("rEs").textContent = money(t.Es); $("rRatio").textContent = x2(t.ratio); $("rLs").textContent = x2(t.Ls);
@@ -474,10 +524,11 @@ function compute() {
     : `<span class="pill bad">${label}</span>`;
   $("tBody").innerHTML = st.holdings.map(h => {
     const unit = num(h.price) * num(h.mult);
-    if (!ok || unit <= 0) return `<tr><td>${esc(h.name)}</td><td class="r" colspan="4">—</td></tr>`;
+    const label = esc(h.name || h.code);
+    if (!ok || unit <= 0) return `<tr><td>${label}</td><td class="r" colspan="4">—</td></tr>`;
     const sh = Math.trunc(dE / unit), amt = Math.abs(sh) * num(h.price);
     const useCash = sh > 0 ? Math.min(Math.max(cash, 0), amt) : 0, borrow = sh > 0 ? amt - useCash : 0;
-    return `<tr><td>${esc(h.name)}</td>
+    return `<tr><td>${label}</td>
       <td class="r num ${sh >= 0 ? "buy" : "sell"}">${sh > 0 ? "買 " : sh < 0 ? "賣 " : ""}${Math.abs(sh).toLocaleString("zh-TW")}</td>
       <td class="r num">${money(amt)}</td><td class="r num">${sh > 0 ? money(useCash) : "—"}</td>
       <td class="r num">${sh > 0 ? money(borrow) : sh < 0 ? "可還 " + money(amt) : "—"}</td></tr>`;
@@ -556,26 +607,39 @@ function drawChart(N0, T, c, mu, rb, preSave) {
 document.addEventListener("input", e => {
   const el = e.target;
   if (el.dataset.k) st[el.dataset.k] = el.type === "number" ? num(el.value) : el.value;
-  else if (el.dataset.l) st[el.dataset.l][+el.dataset.i][el.dataset.f] = el.type === "number" ? num(el.value) : el.value;
+  else if (el.dataset.l) {
+    const i = +el.dataset.i, row = st[el.dataset.l][i];
+    row[el.dataset.f] = el.type === "number" ? num(el.value) : el.value;
+    if (el.dataset.f === "code") {
+      const q = quote(el.value);
+      if (q) {
+        row.name = q[0]; row.price = q[1]; row.mult = guessMult(q[0]);
+        $(`h${i}price`).value = row.price; $(`h${i}mult`).value = row.mult;
+      } else row.name = "";
+      showName(i);
+    }
+  }
   else if (el.id !== "shock") return;
   save(); compute();
 });
 document.addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.del) { st[b.dataset.del].splice(+b.dataset.i, 1); renderLists(); }
-  else if (b.id === "addH") { st.holdings.push({ name: "新標的", shares: 0, price: 0, mult: 1 }); renderLists(); }
+  else if (b.id === "addH") {
+    st.holdings.push({ code: "", name: "", shares: 0, price: 0, mult: 1 }); renderLists();
+    $(`h${st.holdings.length - 1}code`).focus();
+  }
   else if (b.id === "addD") { st.debts.push({ name: "新負債", amt: 0 }); renderLists(); }
-  else if (b.id === "sModeDirect") st.sMode = "direct";
-  else if (b.id === "sModeFormula") st.sMode = "formula";
+  else if (b.dataset.preset) { Object.assign(st, PRESETS[b.dataset.preset]); fillInputs(); }
   else if (b.id === "reset") {
-    st = structuredClone(EXAMPLE); fillInputs(); compute();
+    st = structuredClone(EXAMPLE); if (PRICES) applyPrices(); fillInputs(); compute();
     try { localStorage.removeItem(KEY); } catch (e) {}
     showSave(true); return;
   }
   else return;
   save(); compute();
 });
-fillInputs(); compute(); showSave(restored);
+fillInputs(); compute(); showSave(restored); loadPrices();
 </script>
 </body>
 </html>
