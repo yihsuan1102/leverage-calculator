@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>生命週期槓桿</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* 版面：頂部摘要列 → 四個步驟依序排列，每段左側輸入、右側結果 */
+:root {
+  --bg: #f2f4f3; --surface: #ffffff; --ink: #18211e; --muted: #5b6a64; --line: #d7dfdb;
+  --accent: #1f5c86; --accent-soft: #e3edf5;
+  --good: #2c7a4b; --warn: #a96d12; --bad: #b0392d;
+  --good-soft: #e3f1e8; --warn-soft: #f8eedc; --bad-soft: #f7e3e0;
+  --f-display: "Noto Serif TC", "Songti TC", serif;
+  --f-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --f-num: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1513; --surface: #161e1b; --ink: #e2eae6; --muted: #93a29c; --line: #2a3531;
+  --accent: #79afd9; --accent-soft: #1b2b38;
+  --good: #6cc392; --warn: #e0a84a; --bad: #ec7d70;
+  --good-soft: #17291f; --warn-soft: #2e2416; --bad-soft: #321b18; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1513; --surface: #161e1b; --ink: #e2eae6; --muted: #93a29c; --line: #2a3531;
+  --accent: #79afd9; --accent-soft: #1b2b38;
+  --good: #6cc392; --warn: #e0a84a; --bad: #ec7d70;
+  --good-soft: #17291f; --warn-soft: #2e2416; --bad-soft: #321b18; color-scheme: dark }
+
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.6; }
+[hidden] { display: none !important; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 28px; }
+h1, h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+h1 { font-size: 2rem; letter-spacing: .02em; }
+h2 { font-size: 1.35rem; }
+h3 { font-size: .8rem; letter-spacing: .08em; color: var(--muted); font-weight: 500; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 62ch; }
+header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+
+/* 摘要列 */
+.summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.summary > div { padding: 14px 16px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.summary > div:first-child { border-left: 0; }
+.summary .v { font-family: var(--f-num); font-size: 1.35rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.summary .sub { font-size: .8rem; color: var(--muted); }
+
+/* 步驟段落 */
+section.step { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 20px; border-top: 1px solid var(--line); padding-top: 24px; }
+.step-head { display: flex; flex-direction: column; gap: 6px; }
+.step-no { font-family: var(--f-num); color: var(--accent); font-size: .85rem; letter-spacing: .1em; }
+.step-head p { color: var(--muted); font-size: .85rem; }
+.step-body { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.result { background: transparent; border: 0; padding: 4px 0; }
+
+.fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: .82rem; color: var(--muted); }
+label.f small { color: var(--muted); opacity: .8; font-size: .75rem; }
+input[type=number], input[type=text], select {
+  font: inherit; font-size: .95rem; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 7px 9px; width: 100%; box-sizing: border-box; min-width: 0; }
+input[type=number] { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button { font: inherit; font-size: .85rem; cursor: pointer; border-radius: 6px; padding: 6px 12px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button.x { padding: 4px 8px; color: var(--muted); }
+
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th { text-align: left; font-weight: 500; color: var(--muted); font-size: .78rem; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+td.r, th.r { text-align: right; }
+.edit td input { padding: 5px 7px; }
+.edit td:nth-child(1) { min-width: 110px; }
+.edit td:nth-child(2), .edit td:nth-child(3) { min-width: 90px; }
+.edit td:nth-child(4) { min-width: 64px; }
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; align-items: baseline; }
+.kv dt { color: var(--muted); font-size: .85rem; }
+.kv dd { margin: 0; text-align: right; font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+.kv dd.big { font-size: 1.5rem; font-weight: 600; color: var(--accent); }
+.formula { font-family: var(--f-num); font-size: .8rem; color: var(--muted); background: var(--accent-soft); border-radius: 6px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note { font-size: .82rem; color: var(--muted); }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 500; padding: 2px 10px; border-radius: 999px; white-space: nowrap; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.good { color: var(--good); background: var(--good-soft); }
+.pill.warn { color: var(--warn); background: var(--warn-soft); }
+.pill.bad { color: var(--bad); background: var(--bad-soft); }
+.buy { color: var(--good); } .sell { color: var(--bad); }
+
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+
+.callout { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.callout.big { font-size: 1.05rem; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+svg text { fill: var(--muted); font-family: var(--f-num); font-size: 11px; }
+.chart-line { fill: none; stroke: var(--accent); stroke-width: 2.2; }
+.chart-area { fill: var(--accent-soft); }
+.chart-grid { stroke: var(--line); stroke-width: 1; }
+.chart-one { stroke: var(--muted); stroke-dasharray: 4 4; stroke-width: 1; }
+
+footer { color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line); padding-top: 16px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+
+@media (max-width: 900px) {
+  section.step { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .step-body { grid-template-columns: minmax(0, 1fr); }
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .summary > div { border-left: 0; border-top: 1px solid var(--line); }
+  .summary > div:nth-child(-n+2) { border-top: 0; }
+  .summary > div:nth-child(2n) { border-left: 1px solid var(--line); }
+  .summary > div:last-child { grid-column: 1 / -1; border-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <h1>生命週期槓桿</h1>
+      <p class="lede">記帳 → 算目前槓桿 → 算生命週期的目標槓桿 → 算該買或賣多少。輸入的數字會自動存在你這台裝置的瀏覽器，下次打開會自動載入；不會上傳到任何伺服器。</p>
+      <p class="note" id="saveStatus"></p>
+    </div>
+    <button id="reset" type="button">恢復範例數字</button>
+  </header>
+
+  <div class="summary" aria-live="polite">
+    <div><h3>淨資產 N</h3><span class="v" id="sN"></span><span class="sub" id="sNw"></span></div>
+    <div><h3>股票曝險 E</h3><span class="v" id="sE"></span><span class="sub" id="sEw"></span></div>
+    <div><h3>目前槓桿 L</h3><span class="v" id="sL"></span><span class="sub">E ÷ N</span></div>
+    <div><h3>目標槓桿 L*</h3><span class="v" id="sLs"></span><span class="sub" id="sLsSub"></span></div>
+    <div><h3>需調整曝險 ΔE</h3><span class="v" id="sdE"></span><span class="sub" id="sStatus"></span></div>
+  </div>
+
+  <!-- 一 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-no">STEP 1</span>
+      <h2>資產負債與目前槓桿</h2>
+      <p>每天更新。自住房、房貸、緊急預備金都不放進來。</p>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="fields">
+          <label class="f">現金<small>不含緊急預備金</small><input type="number" id="cash" data-k="cash" step="1000"></label>
+          <label class="f">其他投資資產<small>債券、基金等，不算曝險</small><input type="number" id="other" data-k="other" step="1000"></label>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <h3>持股</h3><button type="button" id="addH">＋ 新增持股</button>
+        </div>
+        <div class="tbl-wrap">
+          <table class="edit">
+            <thead><tr><th>名稱</th><th>股數</th><th>股價</th><th>曝險倍數</th><th class="r">曝險</th><th></th></tr></thead>
+            <tbody id="hBody"></tbody>
+          </table>
+        </div>
+        <p class="note">曝險倍數：一般股票或 ETF 填 1，正2 ETF 填 2；期貨請把「股數 × 股價」填成契約價值。</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <h3>負債</h3><button type="button" id="addD">＋ 新增負債</button>
+        </div>
+        <div class="tbl-wrap">
+          <table class="edit">
+            <thead><tr><th>項目</th><th>餘額</th><th></th></tr></thead>
+            <tbody id="dBody"></tbody>
+          </table>
+        </div>
+        <p class="note">信貸、不限用途借貸、融資、質押、信用卡都算。</p>
+      </div>
+      <div class="panel result">
+        <dl class="kv">
+          <dt>現金</dt><dd id="rCash"></dd>
+          <dt>股票市值</dt><dd id="rMV"></dd>
+          <dt>其他投資資產</dt><dd id="rOther"></dd>
+          <dt>負債</dt><dd id="rDebt"></dd>
+          <dt>淨資產 N</dt><dd id="rN" class="big"></dd>
+          <dt>股票曝險 E</dt><dd id="rE"></dd>
+          <dt>槓桿率 L</dt><dd id="rL" class="big"></dd>
+        </dl>
+        <div class="formula">N = 現金 + 股票市值 + 其他投資 − 負債
+E = Σ(股數 × 股價 × 曝險倍數)
+L = E ÷ N</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 二 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-no">STEP 2</span>
+      <h2>生命週期目標槓桿</h2>
+      <p>把未來的薪水儲蓄也當成資產。每年重新計算 PV、T 和 s。</p>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <h3>每年可投資儲蓄 S</h3>
+        <div class="fields">
+          <label class="f">年薪<input type="number" id="salary" data-k="salary" step="10000"></label>
+          <label class="f">年生活費<input type="number" id="living" data-k="living" step="10000"></label>
+          <label class="f">年利息支出<small>還款中的本金算儲蓄</small><input type="number" id="interest" data-k="interest" step="1000"></label>
+        </div>
+        <h3>未來儲蓄現值 PV</h3>
+        <div class="fields">
+          <label class="f">目前年齡<input type="number" id="age" data-k="age" step="1"></label>
+          <label class="f">距離退休年數 T<input type="number" id="T" data-k="T" step="1" min="0"></label>
+          <label class="f">折現率 d (%)<small>薪水穩定 3–4%</small><input type="number" id="d" data-k="d" step="0.5"></label>
+          <label class="f">PV 折扣 (%)<small>工作不穩可填 70–80</small><input type="number" id="haircut" data-k="haircut" step="5" min="0" max="100"></label>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <h3>股票占終身財富比例 s</h3>
+          <div class="seg" role="group" aria-label="s 的來源">
+            <button type="button" id="sModeDirect">直接填</button>
+            <button type="button" id="sModeFormula">用公式算</button>
+          </div>
+        </div>
+        <div class="fields">
+          <label class="f" id="sDirectWrap">s<input type="number" id="sDirect" data-k="sDirect" step="0.05"></label>
+          <label class="f">預期報酬 (%)<input type="number" id="mu" data-k="mu" step="0.5"></label>
+          <label class="f">借款利率 (%)<input type="number" id="rb" data-k="rb" step="0.25"></label>
+          <label class="f">風險趨避係數<input type="number" id="gamma" data-k="gamma" step="0.5" min="0.1"></label>
+          <label class="f">波動率 (%)<input type="number" id="vol" data-k="vol" step="1" min="1"></label>
+          <label class="f">槓桿上限<input type="number" id="cap" data-k="cap" step="0.1" min="0"></label>
+        </div>
+        <p class="note" id="sFormulaNote"></p>
+      </div>
+      <div class="panel result">
+        <dl class="kv">
+          <dt>每年儲蓄 S</dt><dd id="rS"></dd>
+          <dt>年金因子</dt><dd id="rAF"></dd>
+          <dt>未來儲蓄現值 PV</dt><dd id="rPV"></dd>
+          <dt>終身財富 W</dt><dd id="rW"></dd>
+          <dt>採用的 s</dt><dd id="rs"></dd>
+          <dt>目標曝險 E*</dt><dd id="rEs"></dd>
+          <dt>E* ÷ N</dt><dd id="rRatio"></dd>
+          <dt>目標槓桿 L*</dt><dd id="rLs" class="big"></dd>
+        </dl>
+        <p class="note" id="rLsNote"></p>
+        <div class="formula">PV = S × [1 − (1+d)^(−T)] ÷ d
+W  = N + PV
+E* = s × W
+L* = min(E* ÷ N, 上限)
+s  = (預期報酬 − 借款利率) ÷ (風險趨避 × 波動率²)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 槓桿路徑 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-no">路徑</span>
+      <h2>目標槓桿怎麼隨年齡下降</h2>
+      <p>示意：假設每年報酬都剛好等於預期報酬、年底再平衡、儲蓄不變。</p>
+    </div>
+    <div class="panel" style="gap:10px">
+      <div style="overflow-x:auto"><svg id="chart" viewBox="0 0 760 260" role="img" aria-label="目標槓桿隨年齡變化" style="width:100%;min-width:480px;height:auto"></svg></div>
+      <p class="note" id="chartNote"></p>
+    </div>
+  </section>
+
+  <!-- 三 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-no">STEP 3</span>
+      <h2>再平衡：該買或賣多少</h2>
+      <p>每天只監控；領薪後先用新存的錢調整。|L − L*| 超過門檻就提前調整。</p>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <div class="callout big" id="rebalCallout"></div>
+        <div class="fields">
+          <label class="f">提前調整門檻<input type="number" id="band" data-k="band" step="0.05" min="0"></label>
+        </div>
+        <h3>若全部用單一標的調整</h3>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>標的</th><th class="r">交易股數</th><th class="r">金額</th><th class="r">用現金</th><th class="r">需借款</th></tr></thead>
+            <tbody id="tBody"></tbody>
+          </table>
+        </div>
+        <p class="note">新存的錢請先記進 STEP 1 的「現金」。買進時先用現金，不夠再借款；賣出所得拿去還款。</p>
+      </div>
+      <div class="panel">
+        <h3>漲跌之後槓桿會變多少</h3>
+        <label class="f">大盤漲跌 r：<span class="num" id="rShockLbl"></span>
+          <input type="range" id="shock" min="-50" max="50" step="1" value="-20">
+        </label>
+        <dl class="kv">
+          <dt>新槓桿 L'</dt><dd id="rLp" class="big"></dd>
+          <dt>回到 L* 需調整</dt><dd id="rShockAdj"></dd>
+        </dl>
+        <div class="formula">L' = L(1+r) ÷ (1 + L·r)
+ΔE = L* × N − E
+交易股數 = ΔE ÷ (股價 × 曝險倍數)</div>
+        <p class="note">槓桿大於 1 時方向和直覺相反：漲了要加碼，跌了要賣。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 四 -->
+  <section class="step">
+    <div class="step-head">
+      <span class="step-no">STEP 4</span>
+      <h2>風險控管</h2>
+      <p>借款利率一定要明顯低於股票預期報酬。</p>
+    </div>
+    <div class="step-body">
+      <div class="panel">
+        <h3>斷頭距離（質押或融資）</h3>
+        <div class="fields">
+          <label class="f">質押／融資借款<input type="number" id="mLoan" data-k="mLoan" step="10000" min="0"></label>
+          <label class="f">擔保品市值<input type="number" id="mColl" data-k="mColl" step="10000" min="0"></label>
+          <label class="f">維持率 (%)<small>台灣常見 130%</small><input type="number" id="maint" data-k="maint" step="5"></label>
+        </div>
+        <dl class="kv">
+          <dt>目前維持率</dt><dd id="rMaintNow"></dd>
+          <dt>可承受跌幅</dt><dd id="rMargin" class="big"></dd>
+        </dl>
+        <div class="formula">可承受跌幅 = 1 − 維持率 × 借款 ÷ 擔保品市值</div>
+      </div>
+      <div class="panel result">
+        <dl class="kv">
+          <dt>淨資產歸零的跌幅</dt><dd id="rZero" class="big"></dd>
+          <dt>借款利率 vs 預期報酬</dt><dd id="rSpread"></dd>
+        </dl>
+        <div class="formula">歸零跌幅 = 1 ÷ L</div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>工具</th><th>斷頭風險</th><th>特點</th></tr></thead>
+            <tbody>
+              <tr><td>信貸</td><td>沒有</td><td>每月要還款</td></tr>
+              <tr><td>質押／融資</td><td>有</td><td>跌破維持率要補錢或被賣</td></tr>
+              <tr><td>正2 ETF</td><td>沒有</td><td>不用借錢就有 2 倍，盤整時會耗損</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>這是計算工具，不是投資建議。結果取決於你填的假設。</span>
+    <span>金額單位：新台幣</span>
+  </footer>
+</div>
+
+<script>
+const EXAMPLE = {
+  cash: 200000, other: 0,
+  holdings: [
+    { name: "0050", shares: 6000, price: 190, mult: 1 },
+    { name: "00631L 正2", shares: 1000, price: 160, mult: 2 }
+  ],
+  debts: [{ name: "信貸", amt: 500000 }],
+  salary: 960000, living: 580000, interest: 20000,
+  age: 30, T: 30, d: 3, haircut: 100,
+  sMode: "direct", sDirect: 0.6, mu: 7, rb: 3, gamma: 2, vol: 20, cap: 2,
+  band: 0.2, mLoan: 0, mColl: 0, maint: 130
+};
+const KEY = "lifecycle-leverage-v1";
+let st;
+try { st = JSON.parse(localStorage.getItem(KEY)) || null; } catch (e) { st = null; }
+const restored = !!(st && st.savedAt);
+st = Object.assign(structuredClone(EXAMPLE), st || {});
+const stamp = t => new Date(t).toLocaleString("zh-TW", { dateStyle: "medium", timeStyle: "short" });
+let saveOk = true;
+const save = () => {
+  st.savedAt = Date.now();
+  try { localStorage.setItem(KEY, JSON.stringify(st)); saveOk = true; } catch (e) { saveOk = false; }
+  showSave(false);
+};
+function showSave(onLoad) {
+  $("saveStatus").textContent = !saveOk ? "這個瀏覽器不允許儲存（可能是無痕模式），關掉頁面後資料會消失。"
+    : !st.savedAt ? "目前是範例數字，改任何一格就會開始儲存你的資料。"
+    : onLoad ? `已載入你上次的資料（${stamp(st.savedAt)} 儲存）。`
+    : `已自動儲存（${stamp(st.savedAt)}）。`;
+}
+
+const $ = id => document.getElementById(id);
+const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+const money = n => isFinite(n) ? Math.round(n).toLocaleString("zh-TW") : "—";
+const wan = n => isFinite(n) ? (n / 1e4).toLocaleString("zh-TW", { maximumFractionDigits: 1 }) + " 萬" : "";
+const x2 = n => isFinite(n) ? n.toFixed(2) + " 倍" : "—";
+const pct = n => isFinite(n) ? (n * 100).toFixed(1) + "%" : "—";
+const signed = n => (n > 0 ? "+" : n < 0 ? "−" : "") + money(Math.abs(n));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function renderLists() {
+  $("hBody").innerHTML = st.holdings.map((h, i) => `<tr>
+    <td><input type="text" id="h${i}name" data-l="holdings" data-i="${i}" data-f="name" value="${esc(h.name)}" aria-label="名稱"></td>
+    <td><input type="number" id="h${i}shares" data-l="holdings" data-i="${i}" data-f="shares" value="${h.shares}" step="100" aria-label="股數"></td>
+    <td><input type="number" id="h${i}price" data-l="holdings" data-i="${i}" data-f="price" value="${h.price}" step="0.1" aria-label="股價"></td>
+    <td><input type="number" id="h${i}mult" data-l="holdings" data-i="${i}" data-f="mult" value="${h.mult}" step="1" aria-label="曝險倍數"></td>
+    <td class="r num" id="hE${i}"></td>
+    <td><button type="button" class="x" data-del="holdings" data-i="${i}" aria-label="刪除">✕</button></td></tr>`).join("");
+  $("dBody").innerHTML = st.debts.map((d, i) => `<tr>
+    <td><input type="text" id="d${i}name" data-l="debts" data-i="${i}" data-f="name" value="${esc(d.name)}" aria-label="項目"></td>
+    <td><input type="number" id="d${i}amt" data-l="debts" data-i="${i}" data-f="amt" value="${d.amt}" step="10000" aria-label="餘額"></td>
+    <td><button type="button" class="x" data-del="debts" data-i="${i}" aria-label="刪除">✕</button></td></tr>`).join("");
+}
+function fillInputs() {
+  document.querySelectorAll("[data-k]").forEach(el => { el.value = st[el.dataset.k]; });
+  renderLists();
+}
+
+// 給定 N、剩餘年數，算目標槓桿（STEP 2 和路徑圖共用）
+function targetL(N, T, c) {
+  const PV = c.haircut * (c.d > 0 ? c.S * (1 - Math.pow(1 + c.d, -T)) / c.d : c.S * T);
+  const W = N + PV, Es = c.s * W;
+  const ratio = N > 0 ? Es / N : NaN;
+  const Ls = N > 0 ? Math.max(0, Math.min(ratio, c.cap)) : NaN;
+  return { PV, W, Es, ratio, Ls };
+}
+
+function compute() {
+  const mv = st.holdings.reduce((a, h) => a + num(h.shares) * num(h.price), 0);
+  const E = st.holdings.reduce((a, h) => a + num(h.shares) * num(h.price) * num(h.mult), 0);
+  const debt = st.debts.reduce((a, d) => a + num(d.amt), 0);
+  const cash = num(st.cash), other = num(st.other);
+  const N = cash + mv + other - debt;
+  const L = N > 0 ? E / N : NaN;
+
+  st.holdings.forEach((h, i) => { const c = $("hE" + i); if (c) c.textContent = money(num(h.shares) * num(h.price) * num(h.mult)); });
+  $("rCash").textContent = money(cash); $("rMV").textContent = money(mv); $("rOther").textContent = money(other);
+  $("rDebt").textContent = debt ? "−" + money(debt) : "0";
+  $("rN").textContent = money(N); $("rE").textContent = money(E); $("rL").textContent = N > 0 ? x2(L) : "淨資產 ≤ 0";
+
+  // STEP 2
+  const S = num(st.salary) - num(st.living) - num(st.interest);
+  const d = num(st.d) / 100, T = Math.max(0, num(st.T)), mu = num(st.mu) / 100, rb = num(st.rb) / 100;
+  const gamma = num(st.gamma), vol = num(st.vol) / 100, cap = num(st.cap);
+  const sF = gamma > 0 && vol > 0 ? (mu - rb) / (gamma * vol * vol) : NaN;
+  const s = st.sMode === "formula" ? sF : num(st.sDirect);
+  const c = { S, d, haircut: num(st.haircut) / 100, s, cap };
+  const t = targetL(N, T, c);
+  const AF = d > 0 ? (1 - Math.pow(1 + d, -T)) / d : T;
+
+  $("sModeDirect").setAttribute("aria-pressed", st.sMode !== "formula");
+  $("sModeFormula").setAttribute("aria-pressed", st.sMode === "formula");
+  $("sDirect").disabled = st.sMode === "formula";
+  $("sFormulaNote").textContent = `公式算出 s = (${(mu*100).toFixed(1)}% − ${(rb*100).toFixed(1)}%) ÷ (${gamma} × ${(vol*100).toFixed(0)}%²) = ${isFinite(sF) ? sF.toFixed(2) : "—"}`;
+  $("rS").textContent = money(S); $("rAF").textContent = AF.toFixed(2);
+  $("rPV").textContent = money(t.PV); $("rW").textContent = money(t.W);
+  $("rs").textContent = isFinite(s) ? s.toFixed(2) : "—";
+  $("rEs").textContent = money(t.Es); $("rRatio").textContent = x2(t.ratio); $("rLs").textContent = x2(t.Ls);
+  let stage = "";
+  if (isFinite(t.Ls)) {
+    if (t.ratio >= cap) stage = `E* ÷ N 超過上限 ${cap} 倍，目標停在 ${cap} 倍（第一階段：維持上限）。`;
+    else if (t.Ls > 1) stage = "低於上限但仍大於 1：第二階段，槓桿會逐年下降。";
+    else stage = "不借錢、股票比例小於 100%：第三階段。";
+  }
+  $("rLsNote").textContent = stage;
+
+  // STEP 3
+  const targetE = t.Ls * N, dE = targetE - E;
+  const band = num(st.band), gap = Math.abs(L - t.Ls);
+  const ok = isFinite(dE);
+  let cls = "good", label = "監控中，不用交易";
+  if (!ok) { cls = "bad"; label = "淨資產 ≤ 0，無法計算"; }
+  else if (gap > band) { cls = "warn"; label = `偏離 ${gap.toFixed(2)}，超過門檻，現在調整`; }
+  else if (Math.abs(dE) > 1) label = `偏離 ${gap.toFixed(2)}，領薪後再調整`;
+  $("rebalCallout").innerHTML = ok
+    ? `<span class="pill ${cls}">${label}</span>
+       <span>目標曝險 <b class="num">${money(targetE)}</b>，目前 <b class="num">${money(E)}</b></span>
+       <span>ΔE = <b class="num ${dE >= 0 ? "buy" : "sell"}">${signed(dE)}</b>　${dE >= 0 ? "買進" : "賣出並還款"}</span>`
+    : `<span class="pill bad">${label}</span>`;
+  $("tBody").innerHTML = st.holdings.map(h => {
+    const unit = num(h.price) * num(h.mult);
+    if (!ok || unit <= 0) return `<tr><td>${esc(h.name)}</td><td class="r" colspan="4">—</td></tr>`;
+    const sh = Math.trunc(dE / unit), amt = Math.abs(sh) * num(h.price);
+    const useCash = sh > 0 ? Math.min(Math.max(cash, 0), amt) : 0, borrow = sh > 0 ? amt - useCash : 0;
+    return `<tr><td>${esc(h.name)}</td>
+      <td class="r num ${sh >= 0 ? "buy" : "sell"}">${sh > 0 ? "買 " : sh < 0 ? "賣 " : ""}${Math.abs(sh).toLocaleString("zh-TW")}</td>
+      <td class="r num">${money(amt)}</td><td class="r num">${sh > 0 ? money(useCash) : "—"}</td>
+      <td class="r num">${sh > 0 ? money(borrow) : sh < 0 ? "可還 " + money(amt) : "—"}</td></tr>`;
+  }).join("");
+
+  // 漲跌模擬
+  const r = num($("shock").value) / 100;
+  $("rShockLbl").textContent = (r > 0 ? "+" : "") + (r * 100).toFixed(0) + "%";
+  const den = 1 + L * r;
+  if (!isFinite(L)) { $("rLp").textContent = "—"; $("rShockAdj").textContent = "—"; }
+  else if (den <= 0) { $("rLp").textContent = "淨資產歸零"; $("rShockAdj").textContent = "—"; }
+  else {
+    const Lp = L * (1 + r) / den, Np = N * den, Ep = E * (1 + r);
+    $("rLp").textContent = x2(Lp);
+    const adj = t.Ls * Np - Ep;
+    $("rShockAdj").innerHTML = `<span class="${adj >= 0 ? "buy" : "sell"}">${adj >= 0 ? "買進 " : "賣出 "}${money(Math.abs(adj))}</span>`;
+  }
+
+  // STEP 4
+  const loan = num(st.mLoan), coll = num(st.mColl), maint = num(st.maint) / 100;
+  if (loan > 0 && coll > 0) {
+    $("rMaintNow").textContent = pct(coll / loan);
+    const m = 1 - maint * loan / coll;
+    $("rMargin").innerHTML = m > 0 ? pct(m) : `<span class="sell">已低於維持率</span>`;
+  } else { $("rMaintNow").textContent = "—"; $("rMargin").textContent = "沒有質押借款"; }
+  $("rZero").textContent = L > 0 ? (L > 1 ? "大盤跌 " + pct(1 / L) : "槓桿 ≤ 1，不會歸零") : "—";
+  const spread = mu - rb;
+  $("rSpread").innerHTML = `<span class="pill ${spread >= 0.03 ? "good" : spread > 0 ? "warn" : "bad"}">利差 ${(spread * 100).toFixed(1)}%</span>`;
+
+  // 摘要
+  $("sN").textContent = money(N); $("sNw").textContent = wan(N);
+  $("sE").textContent = money(E); $("sEw").textContent = wan(E);
+  $("sL").textContent = N > 0 ? x2(L) : "—";
+  $("sLs").textContent = x2(t.Ls); $("sLsSub").textContent = isFinite(t.Ls) ? "目標曝險 " + wan(targetE) : "";
+  $("sdE").innerHTML = ok ? `<span class="${dE >= 0 ? "buy" : "sell"}">${signed(dE)}</span>` : "—";
+  $("sStatus").innerHTML = `<span class="pill ${cls}">${!ok ? "無法計算" : gap > band ? "需要調整" : "監控中"}</span>`;
+
+  drawChart(N, T, c, mu, rb, num(st.salary) - num(st.living));
+}
+
+function drawChart(N0, T, c, mu, rb, preSave) {
+  const svg = $("chart"), age0 = num(st.age);
+  const pts = []; let N = N0;
+  for (let k = 0; k <= T; k++) {
+    if (!(N > 0)) break;
+    const { Ls } = targetL(N, T - k, c);
+    pts.push([age0 + k, Ls]);
+    const E = Ls * N;
+    N = N + mu * E - rb * Math.max(E - N, 0) + preSave;
+  }
+  const W = 760, H = 260, L = 44, R = 16, Tp = 14, B = 34;
+  const yMax = Math.max(c.cap, 1.2, ...pts.map(p => p[1])) * 1.08;
+  const xMin = age0, xMax = age0 + Math.max(T, 1);
+  const X = a => L + (a - xMin) / (xMax - xMin) * (W - L - R);
+  const Y = v => Tp + (1 - v / yMax) * (H - Tp - B);
+  let g = "";
+  const step = yMax > 2.5 ? 1 : 0.5;
+  for (let v = 0; v <= yMax + 1e-9; v += step) g += `<line class="chart-grid" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end">${v.toFixed(1)}</text>`;
+  const xs = Math.max(1, Math.ceil((xMax - xMin) / 6 / 5) * 5);
+  for (let a = Math.ceil(xMin / xs) * xs; a <= xMax; a += xs) g += `<text x="${X(a)}" y="${H - 12}" text-anchor="middle">${a} 歲</text>`;
+  g += `<line class="chart-one" x1="${L}" x2="${W - R}" y1="${Y(1)}" y2="${Y(1)}"/><text x="${W - R}" y="${Y(1) - 6}" text-anchor="end">1 倍＝不借錢</text>`;
+  if (pts.length > 1) {
+    const line = pts.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" ");
+    g += `<polygon class="chart-area" points="${X(pts[0][0])},${Y(0)} ${line} ${X(pts[pts.length - 1][0])},${Y(0)}"/>`;
+    g += `<polyline class="chart-line" points="${line}"/>`;
+    const p0 = pts[0];
+    g += `<circle cx="${X(p0[0])}" cy="${Y(p0[1])}" r="4.5" fill="var(--accent)"/>`;
+  }
+  svg.innerHTML = g;
+  const below2 = pts.find(p => p[1] < c.cap - 1e-6), below1 = pts.find(p => p[1] <= 1);
+  $("chartNote").textContent = pts.length < 2 ? "淨資產或年數不足，無法畫出路徑。" :
+    [below2 ? `約 ${below2[0]} 歲開始低於上限` : "到退休都維持在上限",
+     below1 ? `約 ${below1[0]} 歲降到不借錢` : "到退休前都還有借款"].join("；") + "。報酬用預期報酬、借款成本用借款利率、每年再投入「年薪 − 生活費」。";
+}
+
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (el.dataset.k) st[el.dataset.k] = el.type === "number" ? num(el.value) : el.value;
+  else if (el.dataset.l) st[el.dataset.l][+el.dataset.i][el.dataset.f] = el.type === "number" ? num(el.value) : el.value;
+  else if (el.id !== "shock") return;
+  save(); compute();
+});
+document.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.del) { st[b.dataset.del].splice(+b.dataset.i, 1); renderLists(); }
+  else if (b.id === "addH") { st.holdings.push({ name: "新標的", shares: 0, price: 0, mult: 1 }); renderLists(); }
+  else if (b.id === "addD") { st.debts.push({ name: "新負債", amt: 0 }); renderLists(); }
+  else if (b.id === "sModeDirect") st.sMode = "direct";
+  else if (b.id === "sModeFormula") st.sMode = "formula";
+  else if (b.id === "reset") {
+    st = structuredClone(EXAMPLE); fillInputs(); compute();
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    showSave(true); return;
+  }
+  else return;
+  save(); compute();
+});
+fillInputs(); compute(); showSave(restored);
+</script>
+</body>
+</html>
